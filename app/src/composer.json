@@ -1,0 +1,30 @@
+{
+    "version": "1.0.0",
+    "name": "bypikod/php-blog",
+    "description": "A simple blog application written in PHP",
+    "type": "project",
+    "license": "MIT",
+    "keywords": ["php", "blog", "simple", "application"],
+    "authors": [
+        {
+            "name": "Yahya Batulu",
+            "email": "admin@yahyabatulu.com"
+        }
+    ],
+    "source": {
+        "url": "https://github.com/ByPikod/php-blog",
+        "type": "git",
+        "reference": "master"
+    },
+    "support": {
+        "email": "admin@yahyabatulu.com",
+        "source": "https://github.com/ByPikod/php-blog",
+        "issues": "https://github.com/ByPikod/php-blog/issues"
+    },
+    "homepage": "https://github.com/ByPikod/php-blog#readme",
+    "autoload": {
+        "psr-4": {
+            "Core\\": "core/"
+        }
+    }
+}
