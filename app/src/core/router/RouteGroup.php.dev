@@ -1,0 +1,68 @@
+<?php
+
+namespace Core\Router;
+
+use Closure;
+
+/**
+ * Route class
+ * @since 1.0.0
+ */
+class RouteGroup extends MiddlewareAddable
+{
+    protected $routes = [];
+
+    /**
+     * Extracts the groups from the routes array and returns an array of full Routes.
+     * Also extracts the middlewares from the routes array and adds them to the routes.
+     * @param string $path Base path of the group
+     * @return array Array of full Routes ready to invoke.
+     * @since 1.0.0s
+     */
+    protected function extractRoutes($basePath = ''): array
+    {
+        $routes = [];
+        foreach ($this->routes as $path => $route) {
+            // if another group is found, extract the routes from it and add them to the routes array
+            if ($route instanceof RouteGroup) {
+                $groupRoutes = $route->extractRoutes($basePath . $path);
+                foreach ($groupRoutes as $groupPath => $groupRoute) {
+                    $groupRouteMiddlewares = $groupRoute->__middlewares();
+                    array_unshift($groupRouteMiddlewares, ...$this->middlewares);
+                    $routes[$groupPath] = $groupRoute;
+                }
+                continue;
+            }
+            // else, add the route to the routes array
+            $route->use(...$this->middlewares);
+            $routes[$basePath . $path] = $route;
+        }
+        return $routes;
+    }
+
+    /**
+     * Creates a route group
+     * @param string $path Route group path (correct eg: /api/v1)
+     * @return RouteGroup Route group object where you can add routes to it.
+     */
+    public function group(string $path): RouteGroup
+    {
+        $routeGroup = new RouteGroup();
+        $this->routes[$path] = $routeGroup;
+        return $routeGroup;
+    }
+
+    /**
+     * Add a route
+     * @param string $path Route path
+     * @param Closure $callback Route callback
+     * @return Route Route object where you can add middlewares to it.
+     * @since 1.0.0
+     */
+    public function route(string $path, Closure $callback): Route
+    {
+        $route = new RouteExtended($path, $callback);
+        $this->routes[$path] = $route;
+        return $route;
+    }
+}

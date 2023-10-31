@@ -1,18 +1,17 @@
 version: '3.8'
 services:
-  app:
-    build:
-      context: app
-      dockerfile: Dockerfile
-    container_name: php
-    volumes:
-      - ./app/src:/var/www/html/
-      - ./app/site.conf:/etc/apache2/sites-available/my-site.conf
-    ports:
-      - 80:80
   mysql:
     container_name: mysql
     image: mariadb:latest
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: php-blog
+  app:
+    build:
+      context: app
+      dockerfile: Dockerfile
+    container_name: app
+    volumes:
+      - ./app/src:/var/www/html/
+    depends_on:
+      - mysql

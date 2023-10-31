@@ -1,0 +1,18 @@
+<?php
+
+namespace Core\Router;
+
+/**
+ * MiddlewareAddable class
+ * @since 1.0.0
+ */
+abstract class MiddlewareAddable
+{
+    protected $middlewares = [];
+
+    public function use(callable $middleware): MiddlewareAddable
+    {
+        array_push($this->middlewares, $middleware);
+        return $this;
+    }
+}

@@ -10,7 +10,7 @@ WORKDIR /var/www/html
 # Copy project files to the docker image
 COPY src .
 # Copy apache config file to the docker image
-COPY ./site.conf /etc/apache2/sites-available/my-site.conf
+COPY ./apache.conf /etc/apache2/sites-available/my-site.conf
 
 # Configurations
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf

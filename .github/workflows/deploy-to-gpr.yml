@@ -10,20 +10,26 @@ jobs:
     - name: Copy Repo Files
       uses: actions/checkout@master
 
-     #This Action Emits 2 Variables, IMAGE_SHA_NAME and IMAGE_URL 
-     #which you can reference in subsequent steps
-    - name: Publish Docker Image to GPR
+    - name: Publish Backend Docker Image to GPR
       uses: machine-learning-apps/gpr-docker-publish@master
-      id: docker
+      id: backend
       with:
-        IMAGE_NAME: 'php-blog'
+        IMAGE_NAME: 'php-blog-backend'
+        DOCKERFILE_PATH: 'Dockerfile'
+        BUILD_CONTEXT: 'src'
+      env:
+        GITHUB_TOKEN: ${{ secrets.PUBLISH_GITHUB_SECRET }}
+        
+    - name: Publish Front End Docker Image to GPR
+      uses: machine-learning-apps/gpr-docker-publish@master
+      id: frontend
+      with:
+        IMAGE_NAME: 'php-blog-frontend'
         DOCKERFILE_PATH: 'Dockerfile'
         BUILD_CONTEXT: 'src'
       env:
         GITHUB_TOKEN: ${{ secrets.PUBLISH_GITHUB_SECRET }}
 
-    # This second step is illustrative and shows how to reference the 
-    # output variables.  This is completely optional.
     - name: Show outputs of previous step
       run: |
         echo "The name:tag of the Docker Image is: $VAR1"
@@ -31,3 +37,4 @@ jobs:
       env:
         VAR1: ${{ steps.docker.outputs.IMAGE_SHA_NAME }}
         VAR2: ${{ steps.docker.outputs.IMAGE_URL }}
+  
