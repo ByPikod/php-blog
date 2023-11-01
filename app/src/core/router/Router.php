@@ -19,7 +19,7 @@ class Router implements RouteGroup
      * @return MiddlewareChain The middleware chain to allow adding middlewares.
      * @since 1.0.0
      */
-    public function use(callable $middleware): MiddlewareChain
+    public function use(callable $middleware, $path = ''): MiddlewareChain
     {
         $this->executionTree[] = $middleware;
         return $this;

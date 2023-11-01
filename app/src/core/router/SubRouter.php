@@ -14,6 +14,10 @@ class SubRouter implements RouteGroup
     private Closure $cb_group;
     private Closure $cb_use;
 
+    /**
+     * Constructor
+     * @since 1.0.0
+     */
     public function __construct(
         Closure $cb_route,
         Closure $cb_group,
@@ -30,9 +34,9 @@ class SubRouter implements RouteGroup
      * @return MiddlewareChain The middleware chain to allow adding middlewares.
      * @since 1.0.0
      */
-    public function use(Closure $middleware): MiddlewareChain
+    public function use(Closure $middleware, $path = ''): MiddlewareChain
     {
-        ($this->cb_use)($middleware);
+        ($this->cb_use)($middleware, $path);
         return $this;
     }
 
