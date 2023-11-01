@@ -19,7 +19,7 @@ class Context
      * @param Closure $next Callback to be invoked when the next middleware is called
      * @since 1.0.0
      */
-    public function __construct(Closure $next)
+    public function __construct(callable $next)
     {
         $this->next = $next;
     }
