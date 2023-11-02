@@ -15,3 +15,5 @@ services:
       - ./app/src:/var/www/html/
     depends_on:
       - mysql
+    ports:
+      - 80:80
