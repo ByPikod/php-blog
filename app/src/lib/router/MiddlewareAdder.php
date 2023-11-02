@@ -1,8 +1,9 @@
 <?php
 
-namespace Core\Router;
+namespace Lib\Router;
 
 use Closure;
+use Lib\Router\MiddlewareChain;
 
 /**
  * MiddlewareAdder class created to be used by the router class.
@@ -30,9 +31,9 @@ class MiddlewareAdder implements MiddlewareChain
      * @return MiddlewareAdder The middleware adder itself to allow chaining.
      * @since 1.0.0
      */
-    public function use(callable $middleware): MiddlewareAdder
+    public function use(callable $middleware, $path = ''): MiddlewareChain
     {
-        ($this->callback)($middleware);
+        ($this->callback)($middleware, $path);
         return $this;
     }
 }

@@ -1,9 +1,9 @@
 <?php
 
-namespace Core\Router;
+namespace Lib\Router;
 
 use Closure;
-use Core\Router\Route;
+use Lib\Router\Route;
 
 /**
  * Router class
@@ -13,6 +13,13 @@ use Core\Router\Route;
 class Router implements RouteGroup
 {
     protected array $executionTree = [];
+
+    public function __test()
+    {
+        echo "<pre>";
+        print_r($this->executionTree);
+        echo "</pre>";
+    }
 
     /**
      * Seperate the path into an array of strings.
@@ -34,7 +41,7 @@ class Router implements RouteGroup
      * @return array The branch.
      * @since 1.0.0
      */
-    private function getBranch(string $path, bool $popLast): array
+    private function &getBranch(string $path, bool $popLast): array
     {
         // Seperate to parts
         $path = self::seperatePath($path);
@@ -51,7 +58,7 @@ class Router implements RouteGroup
                 // Create new branch
                 $branch[$value] = [];
             }
-            $branch = $branch[$value];
+            $branch = &$branch[$value];
         }
 
         return $branch;
@@ -62,7 +69,7 @@ class Router implements RouteGroup
      * @param callable $middleware The middleware to add.
      * @return MiddlewareChain The middleware chain to allow adding middlewares.
      * @since 1.0.0
-     * @todo Implement this function
+     * @todo Test
      */
     public function use(callable $middleware, $path = ''): MiddlewareChain
     {
@@ -80,8 +87,9 @@ class Router implements RouteGroup
      */
     public function route(string $path, callable $callback): MiddlewareChain
     {
+        // popping the last element of the path since it's the route name
         $route = new Route($path, $callback);
-        $this->executionTree[] = $route;
+        $this->getBranch($path, true)[] = $route;
         return new MiddlewareAdder(function ($middleware) use ($route) {
             $route->middlewares[] = $middleware;
         });

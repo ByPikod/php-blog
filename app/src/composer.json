@@ -24,7 +24,7 @@
     "homepage": "https://github.com/ByPikod/php-blog#readme",
     "autoload": {
         "psr-4": {
-            "Core\\": "core/"
+            "Lib\\": "lib/"
         },
         "files": ["core/autoload.php"]
     }
