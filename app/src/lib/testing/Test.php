@@ -3,6 +3,7 @@
 namespace Lib\Testing;
 
 use Lib\Testing\TestException;
+use ReflectionClass;
 
 const TEXT_SUITE_TEST_RESULT = <<<EOD
 Results:
@@ -44,6 +45,8 @@ class Test
             $callback($test);
             $result = new TestResult($name);
         } catch (TestException $e) {
+            $result = new TestResult($name, $e);
+        } catch (\Exception $e) {
             $result = new TestResult($name, $e);
         }
 
@@ -94,6 +97,54 @@ class Test
         // Print results
         echo "\n";
         echo $result;
+    }
+
+    /**
+     * Run all tests in a class
+     * use @test annotation to mark tests
+     * @param object $obj Object
+     * @since 1.0.0
+     */
+    public static function suiteClass(object $obj, string $name = null)
+    {
+        // Filter methods
+        $class = get_class($obj);
+        $className = $name ?? $class;
+        $reflection = new ReflectionClass($class);
+        $methods = $reflection->getMethods();
+        $methods = array_map(function ($method) {
+            // Get doc comments of method
+            $doc = $method->getDocComment();
+
+            // Match @test annotation and extract test name if there is one
+            $matches = [];
+            $match = preg_match("/@test(\s(?<testName>.*))?/", $doc, $matches);
+            if (!$match)
+                return;
+
+            // Return test name and method
+            $testName = $matches['testName'] ?? $method->getName();
+            return array(
+                'testName' => $testName,
+                'method' => $method,
+            );
+        }, $methods);
+
+        // Remove null values
+        $methods = array_filter($methods);
+
+        // Create suite
+        self::suite($class, function ($it) use ($methods, $obj) {
+            var_dump($methods);
+            foreach ($methods as $method) {
+                $testName = $method['testName'];
+                $actualMethod = $method['method'];
+                $name = $actualMethod->getName(); // Extract method name to call it.
+                $it($testName, function ($test) use ($obj, $name) {
+                    $obj->$name($test); // Call method
+                });
+            }
+        });
     }
 
     /**

@@ -14,20 +14,13 @@ class Router implements RouteGroup
 {
     protected array $executionTree = [];
 
-    public function __test()
-    {
-        echo "<pre>";
-        print_r($this->executionTree);
-        echo "</pre>";
-    }
-
     /**
      * Seperate the path into an array of strings.
      * @param string $path The path to seperate.
      * @return array The array of strings.
      * @since 1.0.0
      */
-    private static function seperatePath(string $path): array
+    protected static function seperatePath(string $path): array
     {
         $path = trim($path, '/');
         $path = explode('/', $path);
@@ -41,7 +34,7 @@ class Router implements RouteGroup
      * @return array The branch.
      * @since 1.0.0
      */
-    private function &getBranch(string $path, bool $popLast): array
+    protected function &getBranch(string $path, bool $popLast): array
     {
         // Seperate to parts
         $path = self::seperatePath($path);
