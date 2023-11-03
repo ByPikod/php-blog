@@ -1,16 +1,13 @@
-# Guide
-
-This is the documentation for the `lib` folder.
-
-## Router
-
-You can use the router with the `Router` class.
-
-## Testing
+# Testing
 
 You can test your code with "Testing" package of this library.
 
-### Basic Test
+![Suite test example](../promotions/suite.png)
+
+> [!Warning]
+Minimum PHP version for this package is PHP7.
+
+## Basic Test
 
 ```php
 Test::it("test", function (Test $test) {
@@ -18,7 +15,7 @@ Test::it("test", function (Test $test) {
 });
 ```
 
-### Suite Test
+## Suite Test
 
 ```php
 Test::suite("test", function ($it) {
@@ -31,7 +28,7 @@ Test::suite("test", function ($it) {
 });
 ```
 
-### Suite Test with Class
+## Suite Test with Class
 
 ```php
 class RouterTest extends Router
