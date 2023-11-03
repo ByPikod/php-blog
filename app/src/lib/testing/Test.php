@@ -2,25 +2,31 @@
 
 namespace Lib\Testing;
 
-use Lib\Testing\TestException;
+use Lib\Testing\AssertionError;
 use ReflectionClass;
 
 const TEXT_SUITE_TEST_RESULT = <<<EOD
+Test suite:
+%s
+
 Results:
     Suit Name: %s
     Passed: %s
     Failed: %s\n
 EOD;
 
-const TEXT_SUITE_TEST = <<<EOD
-Test suite:\n
-EOD;
+const METHOD_FILTERING_ERRORS = [
+    "METHOD_NOT_PUBLIC" => "Method %s is marked as a test but its not public.",
+    "METHOD_INCORRECT_PARAMETERS" => "Method %s marked as a test but it has incorrect number of parameters",
+    "METHOD_NO_TYPE_HINT" => "Method %s is marked as a test but has no type hint.",
+    "METHOD_INCORRECT_TYPE_HINT" => "Method %s is marked as a test but has incorrect type hint %s.",
+];
 
 /**
  * TestManager class
  * @since 1.0.0
  */
-class Test
+class Test extends Assertions
 {
     /**
      * Private constructor to prevent instantiation.
@@ -41,14 +47,29 @@ class Test
     {
         $test = new Test();
         $result = null;
+        $unhandledErrors = [];
+
+        // Capture warnings and notices
+        set_error_handler(function ($errno, $errstr, $errfile, $errline) use (&$unhandledErrors) {
+            $unhandledErrors[] = new \ErrorException($errstr, 0, $errno, $errfile, $errline);
+        });
+
+        // Capture outputs
+        ob_start();
+
         try {
             $callback($test);
-            $result = new TestResult($name);
-        } catch (TestException $e) {
-            $result = new TestResult($name, $e);
-        } catch (\Exception $e) {
-            $result = new TestResult($name, $e);
+            $outputs = ob_get_clean();
+            $result = new TestResult($name, $unhandledErrors, $outputs);
+        } catch (AssertionError $e) {
+            $outputs = ob_get_clean();
+            $result = new TestResult($name, $unhandledErrors, $outputs, $e);
+        } catch (\Throwable $e) {
+            $outputs = ob_get_clean();
+            $result = new TestResult($name, $unhandledErrors, $outputs, $e);
         }
+
+        restore_error_handler();
 
         return $result;
     }
@@ -71,32 +92,102 @@ class Test
         // Statistics
         $passed = 0;
         $failed = 0;
-
-        echo TEXT_SUITE_TEST;
+        $tests = [];
 
         // Run all tests
-        $callback(function ($name, $callback) use (&$passed, &$failed) {
-            $result = self::test($name, $callback); // Run test
-            $message = $result->message; // Get message
-            $message = "\u{2022} " . $message; // Add bullet point
-            $message = preg_replace('/^/m', '    ', $message); // Indent
-            echo $message;
-            if ($result->passed) $passed++;
+        $callback(function ($name, $callback) use (&$passed, &$failed, &$tests) {
+            $testResult = self::test($name, $callback); // Run test
+            $message = $testResult->message; // Get message
+            $message = Utilities::indent(1, $message); // Indent
+            $tests[] = $message; // Add to tests
+            if ($testResult->passed) $passed++;
             else $failed++;
         });
+
+        $total = $passed + $failed;
 
         // Format results
         $result = sprintf(
             TEXT_SUITE_TEST_RESULT,
+            implode('', $tests),
             $name,
-            $passed . "/" . $passed + $failed,
-            $failed . "/" . $passed + $failed
+            $passed . "/" . $total,
+            $failed . "/" . $total
         );
-        $result = preg_replace('/^/m', '    ', $result); // Add indentation
 
         // Print results
         echo "\n";
         echo $result;
+    }
+
+    /**
+     * Filter test methods in a class inherited from Test
+     * @param object $obj Object to filter
+     * @return array Filtered methods
+     * @since 1.0.0
+     * @throws MethodFilteringError
+     */
+    private static function filterTestMethods(object $obj): array
+    {
+        // Get methods
+        $reflection = new ReflectionClass($obj);
+        $methods = $reflection->getMethods();
+
+        // Filter methods
+        $methods = array_map(function ($method) {
+            // Get doc comments of method
+            $doc = $method->getDocComment();
+
+            // Match @test annotation and extract test name if there is one
+            $matches = [];
+            $match = preg_match("/@test(\s(?<testName>.*))?/", $doc, $matches);
+            if (!$match)
+                return;
+
+            // Check if method is public
+            if (!$method->isPublic())
+                throw new MethodFilteringError(sprintf(
+                    METHOD_FILTERING_ERRORS["METHOD_NOT_PUBLIC"],
+                    $method->getName()
+                ));
+
+            // Check method has correct number of parameters
+            $params = $method->getParameters();
+            if (count($params) != 1)
+                throw new MethodFilteringError(sprintf(
+                    METHOD_FILTERING_ERRORS["METHOD_INCORRECT_PARAMETERS"],
+                    $method->getName()
+                ));
+
+            // Check parameter type
+            $param = $params[0];
+            $type = $param->getType();
+            if ($type == null)
+                throw new MethodFilteringError(sprintf(
+                    METHOD_FILTERING_ERRORS["METHOD_NO_TYPE_HINT"],
+                    $method->getName()
+                ));
+
+            // Check parameter type is Test
+            if ($type->getName() != Test::class)
+                throw new MethodFilteringError(sprintf(
+                    METHOD_FILTERING_ERRORS["METHOD_INCORRECT_TYPE_HINT"],
+                    $method->getName(),
+                    $type->getName()
+                ));
+
+            // Return test name and method
+            $testName = $matches['testName'] ?? $method->getName();
+            return array(
+                'testName' => $testName,
+                'method' => $method,
+            );
+        }, $methods);
+
+        // Remove null values
+        $methods = array_filter($methods);
+
+        return $methods;
     }
 
     /**
@@ -110,360 +201,20 @@ class Test
         // Filter methods
         $class = get_class($obj);
         $className = $name ?? $class;
-        $reflection = new ReflectionClass($class);
-        $methods = $reflection->getMethods();
-        $methods = array_map(function ($method) {
-            // Get doc comments of method
-            $doc = $method->getDocComment();
-
-            // Match @test annotation and extract test name if there is one
-            $matches = [];
-            $match = preg_match("/@test(\s(?<testName>.*))?/", $doc, $matches);
-            if (!$match)
-                return;
-
-            // Return test name and method
-            $testName = $matches['testName'] ?? $method->getName();
-            return array(
-                'testName' => $testName,
-                'method' => $method,
-            );
-        }, $methods);
-
-        // Remove null values
-        $methods = array_filter($methods);
+        $methods = self::filterTestMethods($obj);
 
         // Create suite
         self::suite($class, function ($it) use ($methods, $obj) {
-            var_dump($methods);
             foreach ($methods as $method) {
                 $testName = $method['testName'];
                 $actualMethod = $method['method'];
                 $name = $actualMethod->getName(); // Extract method name to call it.
                 $it($testName, function ($test) use ($obj, $name) {
+                    if (!method_exists($obj, $name)) // Check if method exists
+                        throw new AssertionError("Method {$name} does not exist");
                     $obj->$name($test); // Call method
                 });
             }
         });
-    }
-
-    /**
-     * Throw error
-     * @since 1.0.0
-     */
-    public function fatal($message)
-    {
-        throw new TestException($message);
-    }
-
-    //
-    // Equality assertions
-    //
-
-     /**
-      * Assert that two values are equal
-      * @since 1.0.0
-      */
-    public function assertEqual($a, $b)
-    {
-        if ($a != $b)
-            $this->fatal("{$a} != {$b}");
-    }
-
-    /**
-     * Assert that two values are not equal
-     * @since 1.0.0
-     */
-    public function assertNotEqual($a, $b)
-    {
-        if ($a == $b)
-            $this->fatal("{$a} === {$b}");
-    }
-
-    /**
-     * Assert that reference values are equal
-     * @since 1.0.0
-     */
-    public function assetSame(&$a, &$b)
-    {
-        if ($a !== $b)
-            $this->fatal("{$a} !== {$b}");
-    }
-
-    /**
-     * Assert that reference values are not equal
-     * @since 1.0.0
-     */
-    public function assertNotSame(&$a, &$b)
-    {
-        if ($a === $b)
-            $this->fatal("{$a} === {$b}");
-    }
-
-    //
-    // Nullity assertions
-    //
-
-    /**
-     * Assert that value is null
-     * @since 1.0.0
-     */
-    public function assertNull($a)
-    {
-        if ($a !== null)
-            $this->fatal("{$a} !== null");
-    }
-
-    /**
-     * Assert that value is not null
-     * @since 1.0.0
-     */
-    public function assertNotNull($a)
-    {
-        if ($a === null)
-            $this->fatal("{$a} === null");
-    }
-
-    //
-    // Boolean assertions
-    //
-
-    /**
-     * Assert that value is true
-     * @since 1.0.0
-     */
-    public function assertTrue($a)
-    {
-        if ($a !== true)
-            $this->fatal("{$a} !== true");
-    }
-
-    /**
-     * Assert that value is false
-     * @since 1.0.0
-     */
-    public function assertFalse($a)
-    {
-        if ($a !== false)
-            $this->fatal("{$a} !== false");
-    }
-
-    //
-    // Comparision assertions
-    //
-
-    /**
-     * Assert that value is greater than
-     * @since 1.0.0
-     */
-    public function assertGreaterThan($a, $b)
-    {
-        if ($a <= $b)
-            $this->fatal("{$a} <= {$b}");
-    }
-
-    /**
-     * Assert that value is greater than or equal to
-     * @since 1.0.0
-     */
-    public function assertGreaterThanOrEqual($a, $b)
-    {
-        if ($a < $b)
-            $this->fatal("{$a} < {$b}");
-    }
-
-    /**
-     * Assert that value is less than
-     * @since 1.0.0
-     */
-    public function assertLessThan($a, $b)
-    {
-        if ($a >= $b)
-            $this->fatal("{$a} >= {$b}");
-    }
-
-    /**
-     * Assert that value is less than or equal to
-     * @since 1.0.0
-     */
-    public function assertLessThanOrEqual($a, $b)
-    {
-        if ($a > $b)
-            $this->fatal("{$a} > {$b}");
-    }
-
-    //
-    // String assertions
-    //
-
-    /**
-     * Assert that string contains substring
-     * @since 1.0.0
-     */
-    public function assertContains(string $a, string $b)
-    {
-        if (strpos($a, $b) === false)
-            $this->fatal("{$a} does not contain {$b}");
-    }
-
-    /**
-     * Assert that string does not contain substring
-     * @since 1.0.0
-     */
-    public function assertNotContains(string $a, string $b)
-    {
-        if (strpos($a, $b) !== false)
-            $this->fatal("{$a} contains {$b}");
-    }
-
-    /**
-     * Assert that string starts with substring
-     * @since 1.0.0
-     */
-    public function assertStartsWith(string $a, string $b)
-    {
-        if (strpos($a, $b) !== 0)
-            $this->fatal("{$a} does not start with {$b}");
-    }
-
-    /**
-     * Assert that string does not start with substring
-     * @since 1.0.0
-     */
-    public function assertNotStartsWith(string $a, string $b)
-    {
-        if (strpos($a, $b) === 0)
-            $this->fatal("{$a} starts with {$b}");
-    }
-
-    /**
-     * Assert that string ends with substring
-     * @since 1.0.0
-     */
-    public function assertEndsWith(string $a, string $b)
-    {
-        if (strpos($a, $b) !== strlen($a) - strlen($b))
-            $this->fatal("{$a} does not end with {$b}");
-    }
-
-    /**
-     * Assert that string does not end with substring
-     * @since 1.0.0
-     */
-    public function assertNotEndsWith(string $a, string $b)
-    {
-        if (strpos($a, $b) === strlen($a) - strlen($b))
-            $this->fatal("{$a} ends with {$b}");
-    }
-
-    //
-    // Array assertions
-    //
-
-    /**
-     * Assert that array contains value
-     * @since 1.0.0
-     */
-    public function assertArrayContains(array $a, $b)
-    {
-        if (!in_array($b, $a))
-            $this->fatal("Array does not contain {$b}");
-    }
-
-    /**
-     * Assert that array does not contain value
-     * @since 1.0.0
-     */
-    public function assertArrayNotContains(array $a, $b)
-    {
-        if (in_array($b, $a))
-            $this->fatal("Array contains {$b}");
-    }
-
-    /**
-     * Assert that array contains key
-     * @since 1.0.0
-     */
-    public function assertArrayHasKey(array $a, $b)
-    {
-        if (!array_key_exists($b, $a))
-            $this->fatal("Array does not contain key {$b}");
-    }
-
-    /**
-     * Assert that array does not contain key
-     * @since 1.0.0
-     */
-    public function assertArrayNotHasKey(array $a, $b)
-    {
-        if (array_key_exists($b, $a))
-            $this->fatal("Array contains key {$b}");
-    }
-
-    /**
-     * Assert that array empty
-     * @since 1.0.0
-     */
-    public function assertArrayEmpty(array $a)
-    {
-        if (!empty($a))
-            $this->fatal("Array is not empty");
-    }
-
-    /**
-     * Assert that array not empty
-     * @since 1.0.0
-     */
-    public function assertArrayNotEmpty(array $a)
-    {
-        if (empty($a))
-            $this->fatal("Array is empty");
-    }
-
-    // Exception assertions
-
-    /**
-     * Assert that exception is thrown
-     * @since 1.0.0
-     */
-    public function assertException(callable $callback)
-    {
-        try {
-            $callback();
-        } catch (\Exception $e) {
-            return;
-        }
-
-        $this->fatal("Exception not thrown");
-    }
-
-    /**
-     * Assert that exception is not thrown
-     * @since 1.0.0
-     */
-    public function assertNotException(callable $callback)
-    {
-        try {
-            $callback();
-        } catch (\Exception $e) {
-            $this->fatal("Exception thrown");
-        }
-    }
-
-    //
-    // Other assertions
-    //
-
-    /**
-     * Timeout assertion
-     */
-    public function assertTimeout(int $seconds, callable $callback)
-    {
-        $start = microtime(true);
-        $callback();
-        $end = microtime(true);
-        $elapsed = $end - $start;
-        if ($elapsed > $seconds)
-            $this->fatal("Timeout after {$elapsed} seconds");
     }
 }

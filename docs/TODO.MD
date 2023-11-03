@@ -14,5 +14,5 @@ List of things to do for the project.
 
 - v1.0.0
   - [x] Module operational
+  - [x] Catch print statements and add them to the result
 - WIP
-  - [ ] Catch print statements and add them to the result

@@ -11,7 +11,7 @@ use Closure;
  * @see SubRouter
  * @since 1.0.0
  */
-interface RouteGroup extends MiddlewareChain
+interface RouteGroup extends Middleware
 {
     /**
      * Add route
@@ -19,7 +19,7 @@ interface RouteGroup extends MiddlewareChain
      * @param callable $callback The callback of the route.
      * @since 1.0.0
      */
-    public function route(string $path, callable $callback): MiddlewareChain;
+    public function route(string $path, callable $callback): Middleware;
 
     /**
      * Add route group

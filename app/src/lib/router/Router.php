@@ -47,7 +47,7 @@ class Router implements RouteGroup
         // Get branch
         $branch = &$this->executionTree;
         foreach ($path as $value) {
-            if (is_null($branch[$value])) {
+            if (!array_key_exists($value, $branch)) {
                 // Create new branch
                 $branch[$value] = [];
             }
@@ -60,11 +60,10 @@ class Router implements RouteGroup
     /**
      * Add middlewares
      * @param callable $middleware The middleware to add.
-     * @return MiddlewareChain The middleware chain to allow adding middlewares.
+     * @return Middleware The middleware chain to allow adding middlewares.
      * @since 1.0.0
-     * @todo Test
      */
-    public function use(callable $middleware, $path = ''): MiddlewareChain
+    public function use(callable $middleware, $path = ''): Middleware
     {
         $this->getBranch($path, false)[] = $middleware;
         return $this;
@@ -74,16 +73,16 @@ class Router implements RouteGroup
      * Add route
      * @param string $path The path of the route.
      * @param callable $callback The callback of the route.
-     * @return MiddlewareAdder The middleware adder to allow adding middlewares to the route.
+     * @return MiddlewareChain The middleware adder to allow adding middlewares to the route.
      * @since 1.0.0
      * @todo Implement this function
      */
-    public function route(string $path, callable $callback): MiddlewareChain
+    public function route(string $path, callable $callback): Middleware
     {
         // popping the last element of the path since it's the route name
         $route = new Route($path, $callback);
         $this->getBranch($path, true)[] = $route;
-        return new MiddlewareAdder(function ($middleware) use ($route) {
+        return new MiddlewareChain(function ($middleware) use ($route) {
             $route->middlewares[] = $middleware;
         });
     }
@@ -116,6 +115,37 @@ class Router implements RouteGroup
     }
 
     /**
+     * Walks through the specified branch and executes the middlewares and routes.
+     * @param array $branch The branch to walk through.
+     * @param bool $executeRoutes Whether to execute the routes or not.
+     * @since 1.0.0
+     */
+    public function walkBranch($branch, $executeRoutes = false): void
+    {
+        $branch = &$this->executionTree;
+        foreach ($branch as $key => $value) {
+            echo $key . "\n";
+            if (is_numeric($key)) continue; // skip non-numeric keys (branches)
+
+            // if the value is a route
+            if ($value instanceof Route) {
+                // skip if not executing routes
+                if (!$executeRoutes)
+                    continue;
+                // execute middlewares
+                foreach ($value->middlewares as $middleware) {
+                    $middleware();
+                }
+            }
+
+            // if the value is a middleware
+            if (is_callable($value)) {
+                $value(); // execute the middleware
+            }
+        }
+    }
+
+    /**
      * Run the router
      * @since 1.0.0
      * @todo Implement this function
@@ -123,5 +153,15 @@ class Router implements RouteGroup
     public function run(): void
     {
         $path = $_SERVER['REQUEST_URI'];
+        $path = self::seperatePath($path);
+        $branch = &$this->executionTree;
+        for ($i = 0; $i < count($path); $i++) {
+            $value = $path[$i];
+            $last = $i === count($path) - 1;
+            if (array_key_exists($value, $branch)) {
+                $branch = &$branch[$value];
+                $this->walkBranch($branch, $last);
+            }
+        }
     }
 }

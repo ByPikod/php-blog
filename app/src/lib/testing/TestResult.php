@@ -2,21 +2,29 @@
 
 namespace Lib\Testing;
 
-use Lib\Testing\TestException;
+use Lib\Testing\AssertionError;
 
-const TEXT_TEST_FAILED = <<<EOD
-Test failed:
-    Name: %s
-    Message: %s
-    Traceback:
-    %s\n
+const TEST_PASSED = "[\u{2713}] Test passed: %s\n";
+
+const TEST_PASSED_EXTRA = <<<EOD
+[\u{2713}] Test passed with details:
+    Name: %s%s
 EOD;
 
-const TEXT_TEST_FAILED_ASSERTION = <<<EOD
-Test failed:
+const TEST_FAILED = <<<EOD
+[\u{2717}] Test thrown an exception:
     Name: %s
     Message: %s
-    Assertion: %s\n
+    At: %s
+    Traceback:
+    %s%s
+EOD;
+
+const TEST_FAILED_ASSERTION = <<<EOD
+[\u{2717}] Test failed:
+    Name: %s
+    Message: %s
+    Assertion: %s%s
 EOD;
 
 /**
@@ -27,23 +35,35 @@ class TestResult
 {
     public string $name;
     public bool $passed;
-    public \Exception $exception;
+    public array $unhandledErrors;
+    public string $outputs;
+    public \Throwable $exception;
     public string $message;
 
     /**
      * TestResult constructor
+     * @param string $name Test name
+     * @param array $unhandledErrors Unhandled errors if there is.
+     * @param string $outputs Console outputs if there is.
+     * @param \Throwable $exception Exception if there is.
      * @since 1.0.0
      */
-    public function __construct(string $name, \Exception $exception = null)
-    {
+    public function __construct(
+        string $name,
+        array $unhandledErrors,
+        string $outputs,
+        \Throwable $exception = null
+    ) {
         $this->name = $name;
+        $this->unhandledErrors = $unhandledErrors;
+        $this->outputs = $outputs;
         if ($exception !== null) {
             $this->passed = false;
             $this->exception = $exception;
         } else {
             $this->passed = true;
         }
-        $this->message = self::toString($this);
+        $this->message = $this->generateResults();
     }
 
     /**
@@ -53,10 +73,12 @@ class TestResult
      */
     public static function traceToString(array $trace): string
     {
+        // Extract data from trace
         $file = $trace['file'];
         $line = $trace['line'];
         $function = $trace['function'];
 
+        // Convert arguments to string
         $args = array_map(function ($arg) {
             if (is_string($arg))
                 return "'$arg'";
@@ -67,8 +89,11 @@ class TestResult
             return $arg;
         }, $trace['args'] ?? []);
 
+        // Join arguments with comma
         $args = implode(', ', $args);
-        return "$function($args) @ $file:$line";
+
+        // Return formatted string
+        return "$file:$line | $function($args)";
     }
 
     /**
@@ -79,43 +104,176 @@ class TestResult
      */
     public static function getTracebackAsString(array $traceback): string
     {
-        $traceback = array_splice($traceback, 1, -1);
-
         $traceback = array_map(function ($item) {
             return self::traceToString($item);
         }, $traceback);
 
         $traceback[] = '{main}';
-        $traceback = implode("\n    ", $traceback);
+        $traceback = implode("\n" . Utilities::indent(), $traceback);
         return $traceback;
+    }
+
+    /**
+     * Remove test functions from traceback
+     * @param array $traceback Traceback
+     * @return array Traceback without test functions
+     * @since 1.0.0
+     */
+    private static function cleanTraceback(array $traceback): array
+    {
+        if (sizeof($traceback) === 0) return $traceback;
+
+        //  Remove test functions from traceback
+        $traceback = array_filter($traceback, function ($trace) {
+            // Get trace file path
+            $path = dirname($trace['file']);
+            // If path is the same as the current directory, return false
+            if ($path == __DIR__) return false;
+            // Otherwise, keep the trace
+            return true;
+        });
+
+        return $traceback;
+    }
+
+    /**
+     * Convert unhandled errors list to string
+     * @param array $unhandledErrors Unhandled errors
+     * @return string Unhandled errors as string
+     * @since 1.0.0
+     */
+    private static function unhandledErrorsToString(array $unhandledErrors): string
+    {
+        $text = "Warnings:\n";
+
+        // If there is unhandled errors (warnings, notices, etc.)
+        $unhandledErrors = array_map(function ($error) {
+            // Convert errors to string
+            $message = sprintf(
+                "%s:%s | %s",
+                $error->getFile(),
+                $error->getLine(),
+                $error->getMessage()
+            );
+            $message = Utilities::bullet($message);
+            return Utilities::indent() . $message; // Add indentation
+        }, $unhandledErrors);
+
+        // Join errors with new line
+        $text .= implode("\n", $unhandledErrors);
+        return $text;
+    }
+
+    /**
+     * Convert outputs to string
+     * @param string $outputs Outputs
+     * @return string Outputs as string
+     * @since 1.0.0
+     */
+    private static function formatOutputs(string $outputs): string
+    {
+        $text = "HTML Output:\n";
+        $text .= Utilities::indent(1, $outputs);
+        return $text;
+    }
+
+    /**
+     * Generate addition data (unhandled errors and outputs)
+     * @return string Addition data as string
+     * @since 1.0.0
+     */
+    private function generateAdditionData(): string
+    {
+        $addition = '';
+        // If there is no unhandled errors and no outputs
+        if (sizeof($this->unhandledErrors) < 1 && $this->outputs == '') {
+            return $addition;
+        }
+
+        // Add new line
+        $addition = "\n" . $addition;
+
+        // If there is unhandled errors
+        if (sizeof($this->unhandledErrors) > 0) {
+            $addition .= self::unhandledErrorsToString($this->unhandledErrors) . "\n";
+        }
+
+        // If there is outputs
+        if ($this->outputs != '') {
+            $addition .= self::formatOutputs($this->outputs);
+        }
+
+        return $addition;
     }
 
     /**
      * Convert TestResult to string
      * @param TestResult $result TestResult
      * @return string TestResult as string
-     * @see TEXT_TEST_FAILED
      * @since 1.0.0
      */
-    private static function toString(TestResult $result): string
+    private function generateResults(): string
     {
         // If passed or no exception, return passed message
-        if ($result->passed) {
-            return "Test passed: $result->name\n";
+        if ($this->passed) {
+            // If there is no unhandled errors and no outputs
+            if (sizeof($this->unhandledErrors) < 1 && $this->outputs == '') {
+                return sprintf(TEST_PASSED, $this->name);
+            }
+
+            // Addition data (unhandled errors and outputs)
+            $addition = $this->generateAdditionData();
+            $addition = Utilities::indent(1, $addition);
+
+            // Format and return message
+            return sprintf(
+                TEST_PASSED_EXTRA,
+                $this->name,
+                $addition
+            );
         }
+
         // Otherwise, return failed message
-        if ($result->exception instanceof TestException) {
-            // If exceptiion is a TestException message
-            $exception = $result->exception;
+        if ($this->exception instanceof AssertionError) {
+            // If exceptiion is AssertionError, return assertion message
+            $exception = $this->exception;
             $traceback = $exception->getTrace();
             $assertion = self::traceToString($traceback[1]);
-            return sprintf(TEXT_TEST_FAILED_ASSERTION, $result->name, $exception->getMessage(), $assertion);
+            // Addition data (unhandled errors and outputs)
+            $addition = $this->generateAdditionData();
+            $addition = Utilities::indent(1, $addition);
+            // Format and return message
+            return sprintf(
+                TEST_FAILED_ASSERTION,
+                $this->name,
+                $exception->getMessage(),
+                $assertion,
+                $addition
+            );
         }
+
+        //
         // Otherwise, return exception message
-        $exception = $result->exception;
+        //
+        $exception = $this->exception;
+
+        // Get traceback as string
         $traceback = $exception->getTrace();
+        $traceback = self::cleanTraceback($traceback);
         $traceback = self::getTracebackAsString($traceback);
-        return sprintf(TEXT_TEST_FAILED, $result->name, $exception->getMessage(), $traceback);
+        $traceback = Utilities::indent(1, $traceback);
+
+        // Get exception location
+        $at = "{$exception->getFile()}:{$exception->getLine()}";
+
+        // Format and return message
+        return sprintf(
+            TEST_FAILED,
+            $this->name,
+            $exception->getMessage(),
+            $at,
+            $traceback
+        );
     }
 
     public function __toString(): string

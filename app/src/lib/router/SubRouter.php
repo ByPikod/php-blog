@@ -31,10 +31,10 @@ class SubRouter implements RouteGroup
     /**
      * This function redirected to the parent router.
      * @param Closure $middleware The middleware to add.
-     * @return MiddlewareChain The middleware chain to allow adding middlewares.
+     * @return Middleware The middleware chain to allow adding middlewares.
      * @since 1.0.0
      */
-    public function use(Closure $middleware, $path = ''): MiddlewareChain
+    public function use(Closure $middleware, $path = ''): Middleware
     {
         ($this->cb_use)($middleware, $path);
         return $this;
@@ -44,10 +44,10 @@ class SubRouter implements RouteGroup
      * This function redirected to the parent router.
      * @param string $path The path of the route.
      * @param callable $callback The callback of the route.
-     * @return MiddlewareAdder The middleware adder to allow adding middlewares to the route.
+     * @return MiddlewareChain The middleware adder to allow adding middlewares to the route.
      * @since 1.0.0
      */
-    public function route(string $path, Closure $callback): MiddlewareChain
+    public function route(string $path, Closure $callback): Middleware
     {
         ($this->cb_route)($path, $callback);
         return $this;
