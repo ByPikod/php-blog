@@ -24,25 +24,23 @@ class Router implements RouteGroup
     {
         $path = trim($path, '/');
         $path = explode('/', $path);
+        $path = array_filter($path, function ($value) {
+            return $value !== '';
+        });
         return $path;
     }
 
     /**
      * Returns a branch from the execution tree.
      * @param string $path The path to get the branch from.
-     * @param bool $shiftLast Whether to shift the last element of the path or not.
+     * @param bool $popLast Whether to pop the last element of the path or not.
      * @return array The branch.
      * @since 1.0.0
      */
-    protected function &getBranch(string $path, bool $popLast): array
+    protected function &getBranch(string $path): array
     {
         // Seperate to parts
         $path = self::seperatePath($path);
-
-        // Pop last element if needed
-        if ($popLast) {
-            array_pop($path);
-        }
 
         // Get branch
         $branch = &$this->executionTree;
@@ -65,7 +63,7 @@ class Router implements RouteGroup
      */
     public function use(callable $middleware, $path = ''): Middleware
     {
-        $this->getBranch($path, false)[] = $middleware;
+        $this->getBranch($path)[] = $middleware;
         return $this;
     }
 
@@ -79,9 +77,8 @@ class Router implements RouteGroup
      */
     public function route(string $path, callable $callback): Middleware
     {
-        // popping the last element of the path since it's the route name
         $route = new Route($path, $callback);
-        $this->getBranch($path, true)[] = $route;
+        $this->getBranch($path)[] = $route;
         return new MiddlewareChain(function ($middleware) use ($route) {
             $route->middlewares[] = $middleware;
         });
@@ -115,34 +112,76 @@ class Router implements RouteGroup
     }
 
     /**
-     * Walks through the specified branch and executes the middlewares and routes.
+     * Walks through the specified branch and returns the middlewares and routes.
      * @param array $branch The branch to walk through.
-     * @param bool $executeRoutes Whether to execute the routes or not.
+     * @param Context $ctx The context to pass to the middlewares and routes.
+     * @param bool $routes Whether to return the routes or not.
+     * @return array The middlewares and routes.
      * @since 1.0.0
      */
-    public function walkBranch($branch, $executeRoutes = false): void
+    private static function getExecutables(array $branch, $routes = false): array
     {
-        $branch = &$this->executionTree;
+        $executables = [];
         foreach ($branch as $key => $value) {
-            echo $key . "\n";
-            if (is_numeric($key)) continue; // skip non-numeric keys (branches)
+            if (!is_numeric($key)) continue; // skip non-numeric keys (branches)
 
             // if the value is a route
             if ($value instanceof Route) {
                 // skip if not executing routes
-                if (!$executeRoutes)
+                if (!$routes)
                     continue;
                 // execute middlewares
                 foreach ($value->middlewares as $middleware) {
-                    $middleware();
+                    $executables[] = $value;
                 }
+                $executables[] = $value->callback;
             }
 
             // if the value is a middleware
             if (is_callable($value)) {
-                $value(); // execute the middleware
+                $executables[] = $value;
             }
         }
+        return $executables;
+    }
+
+    /**
+     * Executes the execution tree.
+     * @param string $path The path to execute.
+     * @since 1.0.0
+     */
+    private function executeTree(string $path): void
+    {
+        $pathArray = self::seperatePath($path);
+        $branch = $this->executionTree;
+
+        // Get executables ordered
+        $executables = self::getExecutables($branch, (count($pathArray) === 0));
+        for ($i = 0; $i < count($pathArray); $i++) {
+            $value = $pathArray[$i];
+            // if there is a branch with the specified key
+            if (array_key_exists($value, $branch)) {
+                $branch = $branch[$value];
+                $last = $i >= count($pathArray) - 1;
+                $executables = $executables + self::getExecutables($branch, $last);
+            }
+        }
+
+        // If no executables found, return 404
+        if (count($executables) === 0) {
+            echo "404 Not Found\n";
+            http_response_code(404);
+            return;
+        }
+
+        // Execute executables
+        $i = 1;
+        $ctx = new Context(function ($ctx) use (&$executables, &$i) {
+            // this scope is called when the next() function is called in previous executable
+            $executables[$i]($ctx); // execute the next executable
+            $i++; // increment the index
+        });
+        $executables[0]($ctx); // execute the first executable
     }
 
     /**
@@ -153,15 +192,6 @@ class Router implements RouteGroup
     public function run(): void
     {
         $path = $_SERVER['REQUEST_URI'];
-        $path = self::seperatePath($path);
-        $branch = &$this->executionTree;
-        for ($i = 0; $i < count($path); $i++) {
-            $value = $path[$i];
-            $last = $i === count($path) - 1;
-            if (array_key_exists($value, $branch)) {
-                $branch = &$branch[$value];
-                $this->walkBranch($branch, $last);
-            }
-        }
+        $this->executeTree($path);
     }
 }

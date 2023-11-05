@@ -51,7 +51,7 @@ class Context
      */
     public function next(): void
     {
-        ($this->next)();
+        ($this->next)($this);
     }
 
     /**
