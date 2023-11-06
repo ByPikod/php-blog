@@ -336,4 +336,48 @@ class Assertions
         if ($elapsed > $seconds)
             $this->throwAssertionError("Timeout after {$elapsed} seconds");
     }
+
+    //
+    // Type Assertions
+    //
+
+    /**
+     * Assert that value is of type
+     * @since 1.0.0
+     */
+    public function assertType($a, string $type)
+    {
+        if (gettype($a) !== $type)
+            $this->throwAssertionError("{$a} is not of type {$type}");
+    }
+
+    /**
+     * Assert that value is not of type
+     * @since 1.0.0
+     */
+    public function assertNotType($a, string $type)
+    {
+        if (gettype($a) === $type)
+            $this->throwAssertionError("{$a} is of type {$type}");
+    }
+
+    /**
+     * Assert that value is of class
+     * @since 1.0.0
+     */
+    public function assertInstanceOf(object $a, string $class)
+    {
+        if (!($a instanceof $class))
+            $this->throwAssertionError("{$a} is not an instance of {$class}");
+    }
+
+    /**
+     * Assert that value is not of class
+     * @since 1.0.0
+     */
+    public function assertNotInstanceOf(object $a, string $class)
+    {
+        if ($a instanceof $class)
+            $this->throwAssertionError("{$a} is an instance of {$class}");
+    }
 }
