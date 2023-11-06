@@ -173,6 +173,7 @@ class TestResult
     private static function formatOutputs(string $outputs): string
     {
         $text = "HTML Output:\n";
+        $outputs = trim($outputs);
         $text .= Utilities::indent(1, $outputs);
         return $text;
     }
