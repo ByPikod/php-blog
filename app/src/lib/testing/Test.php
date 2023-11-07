@@ -46,7 +46,6 @@ class Test extends Assertions
     private static function test(string $name, callable $callback): TestResult
     {
         $test = new Test();
-        $result = null;
         $unhandledErrors = [];
 
         // Capture warnings and notices
@@ -57,17 +56,17 @@ class Test extends Assertions
         // Capture outputs
         ob_start();
 
+        // Run test
+        $exception = null;
         try {
             $callback($test);
-            $outputs = ob_get_clean();
-            $result = new TestResult($name, $unhandledErrors, $outputs);
-        } catch (AssertionError $e) {
-            $outputs = ob_get_clean();
-            $result = new TestResult($name, $unhandledErrors, $outputs, $e);
         } catch (\Throwable $e) {
-            $outputs = ob_get_clean();
-            $result = new TestResult($name, $unhandledErrors, $outputs, $e);
+            $exception = $e;
         }
+
+        // Generate result
+        $outputs = ob_get_clean();
+        $result = new TestResult($name, $unhandledErrors, $outputs, $exception);
 
         restore_error_handler();
 

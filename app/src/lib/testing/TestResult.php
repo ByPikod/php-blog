@@ -11,7 +11,7 @@ const TEST_PASSED_EXTRA = <<<EOD
     Name: %s%s
 EOD;
 
-const TEST_FAILED = <<<EOD
+const TEST_THROWN_EXCEPTION = <<<EOD
 [\u{2717}] Test thrown an exception:
     Name: %s
     Message: %s
@@ -220,11 +220,9 @@ class TestResult
             if (sizeof($this->unhandledErrors) < 1 && $this->outputs == '') {
                 return sprintf(TEST_PASSED, $this->name);
             }
-
             // Addition data (unhandled errors and outputs)
             $addition = $this->generateAdditionData();
             $addition = Utilities::indent(1, $addition);
-
             // Format and return message
             return sprintf(
                 TEST_PASSED_EXTRA,
@@ -252,27 +250,27 @@ class TestResult
             );
         }
 
-        //
         // Otherwise, return exception message
-        //
         $exception = $this->exception;
-
         // Get traceback as string
         $traceback = $exception->getTrace();
         $traceback = self::cleanTraceback($traceback);
         $traceback = self::getTracebackAsString($traceback);
         $traceback = Utilities::indent(1, $traceback);
-
         // Get exception location
         $at = "{$exception->getFile()}:{$exception->getLine()}";
+        // Addition data (unhandled errors and outputs)
+        $addition = $this->generateAdditionData();
+        $addition = Utilities::indent(1, $addition);
 
         // Format and return message
         return sprintf(
-            TEST_FAILED,
+            TEST_THROWN_EXCEPTION,
             $this->name,
             $exception->getMessage(),
             $at,
-            $traceback
+            $traceback,
+            $addition
         );
     }
 
