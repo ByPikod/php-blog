@@ -10,9 +10,9 @@ use Closure;
  */
 class Context
 {
-    public int $status = 200;
+    private int $status = 200;
     public array $headers = [];
-    private Closure $next;
+    private Closure $nextfc;
 
     /**
      * Create a new context
@@ -21,7 +21,7 @@ class Context
      */
     public function __construct(callable $next)
     {
-        $this->next = $next;
+        $this->nextfc = $next;
     }
 
     /**
@@ -51,7 +51,7 @@ class Context
      */
     public function next(): void
     {
-        ($this->next)($this);
+        ($this->nextfc)($this);
     }
 
     /**
