@@ -231,6 +231,26 @@ class Assertions
     //
 
     /**
+     * Assert array equals
+     * @since 1.0.0
+     */
+    public function assertArrayEqual(array $a, array $b)
+    {
+        if ($a != $b)
+            $this->throwAssertionError("Arrays are not equal");
+    }
+
+    /**
+     * Assert array equals
+     * @since 1.0.0
+     */
+    public function assertArrayNotEqual(array $a, array $b)
+    {
+        if ($a == $b)
+            $this->throwAssertionError("Arrays are not equal");
+    }
+
+    /**
      * Assert that array contains value
      * @since 1.0.0
      */
