@@ -185,14 +185,11 @@ class TestResult
      */
     private function generateAdditionData(): string
     {
-        $addition = '';
+        $addition = "\n";
         // If there is no unhandled errors and no outputs
         if (sizeof($this->unhandledErrors) < 1 && $this->outputs == '') {
             return $addition;
         }
-
-        // Add new line
-        $addition = "\n" . $addition;
 
         // If there is unhandled errors
         if (sizeof($this->unhandledErrors) > 0) {
@@ -201,7 +198,7 @@ class TestResult
 
         // If there is outputs
         if ($this->outputs != '') {
-            $addition .= self::formatOutputs($this->outputs);
+            $addition .= self::formatOutputs($this->outputs) . "\n";
         }
 
         return $addition;
