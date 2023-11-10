@@ -27,5 +27,8 @@
             "Lib\\": "lib/"
         },
         "files": ["core/autoload.php"]
+    },
+    "require": {
+        "bypikod/php-test": "^1.0"
     }
 }

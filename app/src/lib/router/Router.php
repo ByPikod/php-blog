@@ -8,7 +8,6 @@ use Lib\Router\Route;
 /**
  * Router class
  * @since 1.0.0
- * @todo Implement this class
  */
 class Router implements RouteGroup
 {
@@ -18,50 +17,27 @@ class Router implements RouteGroup
      * Seperate the path into an array of strings.
      * @param string $path The path to seperate.
      * @return array The array of strings.
+     * @example /test/:param/test -> [test, *, test]
      * @since 1.0.0
      */
     protected static function seperatePath(string $path): array
     {
-        $path = trim($path, '/');
-        $path = explode('/', $path);
+        $path = trim($path, '/'); // Remove slashes from start and end
+        $path = explode('/', $path); // Seperate to parts by '/'
+
+        // Remove empty strings (eg. /test//test -> [test, test])
         $path = array_filter($path, function ($value) {
             return $value !== '';
         });
+
+        // Wildcard support (eg. /test/:param/test -> [test, *, test])
+        $path = array_map(function ($value) {
+            if (substr($value, 0, 1) === ':')
+                return '*';
+            return $value;
+        }, $path);
+
         return $path;
-    }
-
-    /**
-     * Walks through the specified branch and returns the middlewares and routes.
-     * @param array $branch The branch to walk through.
-     * @param Context $ctx The context to pass to the middlewares and routes.
-     * @param bool $routes Whether to return the routes or not.
-     * @return array The middlewares and routes.
-     * @since 1.0.0
-     */
-    protected static function getExecutables(array $branch, $routes = false): array
-    {
-        $executables = [];
-        foreach ($branch as $key => $value) {
-            if (!is_numeric($key)) continue; // skip non-numeric keys (branches)
-
-            // if the value is a route
-            if ($value instanceof Route) {
-                // skip if not executing routes
-                if (!$routes)
-                    continue;
-                // execute middlewares
-                foreach ($value->middlewares as $middleware) {
-                    $executables[] = $middleware;
-                }
-                $executables[] = $value->callback;
-            }
-
-            // if the value is a middleware
-            if (is_callable($value)) {
-                $executables[] = $value;
-            }
-        }
-        return $executables;
     }
 
     /**
@@ -69,9 +45,12 @@ class Router implements RouteGroup
      * @param string $path The path to get the branch from.
      * @param bool $popLast Whether to pop the last element of the path or not.
      * @return array The branch.
+     * @example getBranch() -> $executionTree
+     * @example getBranch('/test') -> $executionTree['test']
+     * @example getBranch('/test/:param') -> $executionTree['test']['*']
      * @since 1.0.0
      */
-    protected function &getBranch(string $path): array
+    protected function &getBranch(string $path = ''): array
     {
         // Seperate to parts
         $path = self::seperatePath($path);
@@ -107,7 +86,6 @@ class Router implements RouteGroup
      * @param callable $callback The callback of the route.
      * @return MiddlewareChain The middleware adder to allow adding middlewares to the route.
      * @since 1.0.0
-     * @todo Implement this function
      */
     public function route(string $path, callable $callback): Middleware
     {
@@ -146,26 +124,81 @@ class Router implements RouteGroup
     }
 
     /**
+     * Walks through the specified branch and returns the middlewares and routes.
+     * @param array $branch The branch to walk through.
+     * @param Context $ctx The context to pass to the middlewares and routes.
+     * @param bool $routes Whether to return the routes or not.
+     * @return array The middlewares and routes.
+     * @since 1.0.0
+     */
+    protected static function getExecutablesFromBranch(array $branch, $routes = false): array
+    {
+        $executables = [];
+        foreach ($branch as $key => $value) {
+            if (!is_numeric($key)) continue; // skip non-numeric keys (branches)
+
+            // if the value is a route
+            if ($value instanceof Route) {
+                // skip if not executing routes
+                if (!$routes)
+                    continue;
+                // execute middlewares
+                foreach ($value->middlewares as $middleware) {
+                    $executables[] = $middleware;
+                }
+                $executables[] = $value->callback;
+            }
+
+            // if the value is a middleware
+            if (is_callable($value)) {
+                $executables[] = $value;
+            }
+        }
+
+        return $executables;
+    }
+
+    /**
+     * Returns the executables of the specified path.
+     * That list contains the top level middlewares and the routes.
+     * @param string $path The path to get the executables from.
+     * @return array The executables.
+     * @since 1.0.0
+     */
+    protected function getExecutables(string $path): array
+    {
+        $pathArray = self::seperatePath($path);
+        $branch = $this->executionTree;
+
+        // Get executables ordered
+        $executables = self::getExecutablesFromBranch($branch, (count($pathArray) === 0));
+        for ($i = 0; $i < count($pathArray); $i++) {
+            $value = $pathArray[$i];
+            if (array_key_exists($value, $branch)) {
+                // if there is a branch with the specified key
+                $branch = $branch[$value];
+            } elseif (array_key_exists('*', $branch)) {
+                // if there is no branch with the specified key and there is a wildcard branch
+                $branch = $branch['*'];
+            } else {
+                // if there is no branch with the specified key and there is no wildcard branch
+                break;
+            }
+            $last = $i >= count($pathArray) - 1;
+            $executables = $executables + self::getExecutablesFromBranch($branch, $last);
+        }
+
+        return $executables;
+    }
+
+    /**
      * Executes the execution tree.
      * @param string $path The path to execute.
      * @since 1.0.0
      */
     protected function executeTree(string $path): void
     {
-        $pathArray = self::seperatePath($path);
-        $branch = $this->executionTree;
-
-        // Get executables ordered
-        $executables = self::getExecutables($branch, (count($pathArray) === 0));
-        for ($i = 0; $i < count($pathArray); $i++) {
-            $value = $pathArray[$i];
-            // if there is a branch with the specified key
-            if (array_key_exists($value, $branch)) {
-                $branch = $branch[$value];
-                $last = $i >= count($pathArray) - 1;
-                $executables = $executables + self::getExecutables($branch, $last);
-            }
-        }
+        $executables = $this->getExecutables($path);
 
         // If no executables found, return 404
         if (count($executables) === 0) {
@@ -184,6 +217,15 @@ class Router implements RouteGroup
             $fc($ctx); // execute the next executable
         });
         $executables[0]($ctx); // execute the first executable
+    }
+
+    /**
+     * Removes all routes and middlewares
+     * @since 1.0.0
+     */
+    public function clear(): void
+    {
+        $this->executionTree = [];
     }
 
     /**

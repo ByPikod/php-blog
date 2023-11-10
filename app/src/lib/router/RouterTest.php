@@ -2,7 +2,7 @@
 
 namespace Lib\Router;
 
-use Lib\Testing\Test;
+use PHPTest\Test;
 
 /**
  * RouterTest class
@@ -29,7 +29,10 @@ class RouterTest extends Router
      */
     public function seperatePathTest(Test $test)
     {
-        // Check if the path is seperated correctly
+        // Clear the router
+        $this->clear();
+
+        // Table of assertions
         $assertions = [
             '/' => [],
             '' => [],
@@ -42,23 +45,30 @@ class RouterTest extends Router
             'seperatePathTest/seperatePathTest' => ['seperatePathTest', 'seperatePathTest'],
             'seperatePathTest/seperatePathTest/' => ['seperatePathTest', 'seperatePathTest'],
         ];
+
+        // Check assertions
         foreach ($assertions as $path => $expected) {
             $test->assertArrayEqual(self::seperatePath($path), $expected);
         }
     }
 
     /**
-     * Test method getExecutables
-     * @test Method Test - getExecutables
+     * Result is expected to contain all the executables of a branch.
+     * @test Method Test - getExecutablesFromBranch
      * @since 1.0.0
      */
-    public function getExecutablesTest(Test $test): void
+    public function getExecutablesFromBranchTest(Test $test): void
     {
+        // Clear the router
+        $this->clear();
+
+        // To check if the executables are returned correctly
         $fill = [];
         $fakeFunc = function () use (&$fill) {
             $fill[] = true;
         };
 
+        // Create fake branch
         $branch = [
             new Route('test', $fakeFunc),
             new Route('test', $fakeFunc),
@@ -68,7 +78,8 @@ class RouterTest extends Router
             'test'
         ];
 
-        $executables = self::getExecutables($branch, true);
+        // Get executables and execute them
+        $executables = self::getExecutablesFromBranch($branch, true);
         foreach ($executables as $executable) {
             if (is_callable($executable)) $executable();
             if ($executable instanceof Route) {
@@ -76,8 +87,44 @@ class RouterTest extends Router
             }
         }
 
+        // Check if the executables are correct
         $test->assertEqual(3, sizeof($fill));
         $test->assertArrayEqual($fill, [true, true, true]);
+    }
+
+    /**
+     * Test get executables
+     * @test Method Test - getExecutables
+     * @since 1.0.0
+     */
+    public function getExecutablesTest(Test $test): void
+    {
+        $this->clear(); // Clear the router
+
+        // To check if the executables are returned correctly
+        $fill = [];
+        $fakeFunc = function () use (&$fill) {
+            $fill[] = true;
+        };
+
+        // Add executables
+        $this->use($fakeFunc);
+        $this->use($fakeFunc, '/getExecutablesTest');
+        $this->route('/getExecutablesTest', $fakeFunc)->use($fakeFunc)->use($fakeFunc);
+
+        // Get executables
+        $executables = $this->getExecutables('/getExecutablesTest');
+        foreach ($executables as $executable) {
+            // Execute the executable
+            if (is_callable($executable)) $executable();
+            if ($executable instanceof Route) {
+                ($executable->callback)();
+            }
+        }
+
+        // Check if the executables are correct
+        $test->assertEqual(4, sizeof($fill));
+        $test->assertArrayEqual($fill, [true, true, true, true]);
     }
 
     /**
@@ -87,18 +134,24 @@ class RouterTest extends Router
      */
     public function runExecutablesTest(Test $test): void
     {
+        // Clear the router
+        $this->clear();
+
+        // To check if the executables are returned correctly
         $fill = [];
         $fakeFunc = function (Context $ctx) use (&$fill) {
             $fill[] = true;
             $ctx->next();
         };
 
+        // Add executables
         $this->use($fakeFunc);
         $this->use($fakeFunc, '/executablesTest');
         $this->route('/executablesTest', $fakeFunc)->use($fakeFunc)->use($fakeFunc);
 
+        // Run executables
         $this->executeTree('/executablesTest');
-        $test->assertEqual(4, sizeof($fill));
+        $test->assertEqual(sizeof($fill), 4);
     }
 
     /**
@@ -108,8 +161,11 @@ class RouterTest extends Router
      */
     public function useAdditionTest(Test $test): void
     {
-        $testPassed = false;
+        // Clear the router
+        $this->clear();
+
         // Test use
+        $testPassed = false;
         $this->use(function () use (&$testPassed) {
             $testPassed = true;
         }, '/useAdditionTest');
@@ -124,13 +180,17 @@ class RouterTest extends Router
      */
     public function useTest(Test $test): void
     {
+        // Clear the router
+        $this->clear();
+
+        // Test use
         $_SERVER['REQUEST_URI'] = '/useTest';
         $testPassed = false;
-        // Test use
-        $this->use(function (Context $context) use (&$testPassed) {
+        $this->use(function (Context $ctx) use (&$testPassed) {
             $testPassed = true;
-            $context->next();
+            $ctx->next();
         }, '/useTest');
+
         $this->run();
         $test->assertTrue($testPassed);
     }
@@ -142,14 +202,19 @@ class RouterTest extends Router
      */
     public function routeAdditionTest(Test $test): void
     {
-        $testPassed = false;
+        // Clear the router
+        $this->clear();
+
         // Test route
+        $testPassed = false;
         $this->route('/routeAdditionTest', function () use (&$testPassed) {
             $testPassed = true;
         });
+
         // Test if the route was added
         $route = $this->getBranch('/routeAdditionTest')[0];
         $test->assertInstanceOf($route, Route::class);
+
         // Test if the route has the callback
         ($route->callback)();
         $test->assertTrue($testPassed);
@@ -162,13 +227,18 @@ class RouterTest extends Router
      */
     public function routeTest(Test $test): void
     {
+        // Clear the router
+        $this->clear();
+
+        // Test route
         $_SERVER['REQUEST_URI'] = '/routeTest';
         $testPassed = false;
-        // Test route
+
         $this->route('/routeTest', function (Context $context) use (&$testPassed) {
             $testPassed = true;
             $context->next();
         });
+
         $this->run();
         $test->assertTrue($testPassed);
     }
@@ -180,5 +250,19 @@ class RouterTest extends Router
      */
     public function routeWildcardTest(Test $test): void
     {
+        // Clear the router
+        $this->clear();
+
+        // Test route
+        $_SERVER['REQUEST_URI'] = '/routeWildcardTest/123';
+        $testPassed = false;
+
+        $this->route('/routeWildcardTest/:id', function (Context $context) use (&$testPassed) {
+            $testPassed = true;
+            $context->next();
+        });
+
+        $this->run();
+        $test->assertTrue($testPassed);
     }
 }

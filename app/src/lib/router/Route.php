@@ -25,4 +25,9 @@ class Route
         $this->path = $path;
         $this->callback = $callback;
     }
+
+    public function __toString(): string
+    {
+        return $this->path;
+    }
 }

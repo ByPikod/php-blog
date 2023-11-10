@@ -5,7 +5,7 @@
  */
 
 // use Core\Router\Context;
-use Lib\Testing\Test;
+use PHPTest\Test;
 
 require_once 'autoload.php';
 
