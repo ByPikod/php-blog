@@ -4,8 +4,58 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "54abc38829a6c84f6adf15c7de65a2be",
+    "content-hash": "f5bd739983f029dc52f78150ece80d5e",
     "packages": [
+        {
+            "name": "bypikod/php-router",
+            "version": "1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ByPikod/php-router",
+                "reference": "master"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ByPikod/php-router/zipball/d4eb784d7cadaa2017fe98dad0d2510ace259c6e",
+                "reference": "d4eb784d7cadaa2017fe98dad0d2510ace259c6e",
+                "shasum": ""
+            },
+            "require": {
+                "bypikod/php-test": "^1.0.1"
+            },
+            "bin": [
+                "bin"
+            ],
+            "type": "project",
+            "autoload": {
+                "classmap": [
+                    "src/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Yahya Batulu",
+                    "email": "admin@yahyabatulu.com"
+                }
+            ],
+            "description": "Simple router library with PHP",
+            "homepage": "https://github.com/ByPikod/php-router#readme",
+            "keywords": [
+                "php",
+                "router",
+                "web"
+            ],
+            "support": {
+                "email": "admin@yahyabatulu.com",
+                "issues": "https://github.com/ByPikod/php-router/issues",
+                "source": "https://github.com/ByPikod/php-router"
+            },
+            "time": "2023-11-10T13:55:31+00:00"
+        },
         {
             "name": "bypikod/php-test",
             "version": "1.0.1",

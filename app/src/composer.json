@@ -23,12 +23,10 @@
     },
     "homepage": "https://github.com/ByPikod/php-blog#readme",
     "autoload": {
-        "psr-4": {
-            "Lib\\": "lib/"
-        },
         "files": ["core/autoload.php"]
     },
     "require": {
-        "bypikod/php-test": "^1.0"
+        "bypikod/php-test": "^1.0.1",
+        "bypikod/php-router": "^1.0"
     }
 }
